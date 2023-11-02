@@ -5,9 +5,8 @@ implementing a fuzzer from scratch in python to better understand the art of fuz
 - better mutation
 - make faster
 - coverage
-- log crashes
-
+- 
 # usage
 ```
-python3 fuzzer.py -t SAMPLE_FILE FILE_TO_FUZZ
+python3 fuzzer.py --corpus DIR_SEED --logfile STORE_LOG FILE_TO_FUZZ
 ```
