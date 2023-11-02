@@ -54,6 +54,14 @@ def generate_readable_log(content):
 
   return ret
 
+def get_corpus(corpus_path):
+  ret = {}
+  for filename in os.listdir(corpus_path):
+    filepath = os.path.join(corpus_path, filename)
+    if os.path.isfile(filepath):
+      ret[filename] = bytearray(open(filepath, "rb").read())
+  return ret
+
 def print_log(content):
   log = generate_readable_log(content)
   print(log)
@@ -65,19 +73,20 @@ def write_log_readable(content, out_file):
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
-  parser.add_argument("-t", "--test", help="test case file", required=True)
+  parser.add_argument("--corpus", help="path to sample files", required=True)
   parser.add_argument("--logfile", help="default name for logfile (gets saved to logs folder)", default="mylog.log")
   parser.add_argument("--no-print", help="dont print log info while running", action="store_false", dest="log")
   parser.add_argument("target", help="program to fuzz")
   parser = parser.parse_args()
 
-  filename = parser.test
+  corpus = parser.corpus
   target = parser.target
   show_log_info = parser.log
   log_file = parser.logfile
   keep_fuzzing = True
 
-  data = bytearray(open(filename, "rb").read())
+  #data = bytearray(open(filename, "rb").read())
+  corpus = get_corpus(corpus) # TODO: select from corpus
   dbg = debugger.PtraceDebugger()
 
   while keep_fuzzing:
