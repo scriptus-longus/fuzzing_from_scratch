@@ -3,35 +3,55 @@ from ptrace import debugger
 import random
 import signal
 import os
+import json
 
 corpus_path = "corpus/"
 log_path = "logs/"
+test_case_path = "cases/"
+seed = 1337
 
-# TODO: input corpus
+state = {}
+crash_addresses = []
+#TODO: store current fuzzer state and restore
+#TODO: coverage 
 
 def fuzz(target, data):
   #data_content = bytearray(open(data, "rb").read())
+  crash = {}
   pid = debugger.child.createChild([target, data], no_stdout=True, env=None)
   proc = dbg.addProcess(pid, True)
   proc.cont()
 
-  try:
-    sig = dbg.waitSignals()
-  except:
-    return False
+  event = dbg.waitProcessEvent()  
 
-  if sig.signum == signal.SIGSEGV.value:   # TODO: better signal handling
+  if event.signum == signal.SIGSEGV.value:
+    ip = proc.getInstrPointer()
+
+    for mapping in proc.readMappings():
+      if ip in mapping:
+        address = ip-mapping.start
+
     proc.detach()
-    return True
-  return False
+    if address not in crash_addresses:
+      crash_addresses.append(address)
+
+      crash["addr"] = address
+      crash["crash"] = True
+    else:
+      crash["addr"] = None
+      crash["crash"] = False 
+    return crash
+   
+  crash["addr"] = None 
+  crash["crash"] = False
+  return crash 
 
 def mutate(data):
   idx = random.choice(range(len(data)))
   # just bit flipping
   data[idx]  ^= random.choice([2**0, 2**1, 2**2, 2**3, 2**4, 2**5, 2**6, 2**7])
-  #print(data)
 
-  path = os.path.join(corpus_path, "test_case")
+  path = os.path.join(test_case_path, "test_case")
   with open(path, "wb") as f:
     f.write(data)
 
@@ -71,6 +91,9 @@ def write_log_readable(content, out_file):
   with open(out_file, "a") as f:
     f.write(log + "\n")
 
+def log_fuzzer(state, out_file):
+  pass
+
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument("--corpus", help="path to sample files", required=True)
@@ -85,19 +108,22 @@ if __name__ == "__main__":
   log_file = parser.logfile
   keep_fuzzing = True
 
-  #data = bytearray(open(filename, "rb").read())
-  corpus = get_corpus(corpus) # TODO: select from corpus
+  corpus = get_corpus(corpus)
   dbg = debugger.PtraceDebugger()
+  random.seed(seed)
 
   while keep_fuzzing:
-    test_data = mutate(data)
-    crash = fuzz(target, test_data)
+    corpus_file = random.choice(list(corpus.keys()))
+    data = corpus[corpus_file]
+    test_path = mutate(data)
+    crash = fuzz(target, test_path)
 
-    if crash:
-      print("[*] crash detected")
-      content = make_printable(bytearray(open(test_data, "rb").read()))
+    if crash["crash"]:
+      print(f"[*] crash detected from {corpus_file} at address {hex(crash['addr'])}")
+      content = open(test_path, "rb").read()
+      printable_content = make_printable(bytearray(content))
+
       if show_log_info:
-        print_log(content)
-      write_log_readable(content, os.path.join(log_path, log_file))
-
+        print_log(printable_content)
+      write_log_readable(printable_content, os.path.join(log_path, log_file))
  
