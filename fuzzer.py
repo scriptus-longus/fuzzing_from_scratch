@@ -4,6 +4,10 @@ import random
 import signal
 import os
 import json
+import sys
+
+from elftools.elf.elffile import ELFFile
+from elftools.elf.elffile import SymbolTableSection
 
 corpus_path = "corpus/"
 log_path = "logs/"
@@ -15,11 +19,22 @@ crash_addresses = []
 #TODO: store current fuzzer state and restore
 #TODO: coverage 
 
-def fuzz(target, data):
+def get_base(vmmap, target):
+  for m in vmmap:
+    if "x" in m.permissions and target in m.pathname:
+      return m.start
+
+def fuzz(target, data, breakpoints):
   #data_content = bytearray(open(data, "rb").read())
   crash = {}
   pid = debugger.child.createChild([target, data], no_stdout=True, env=None)
   proc = dbg.addProcess(pid, True)
+  base = get_base(proc.readMappings(), target)
+
+  
+  for bp in breakpoints: 
+    proc.createBreakpoint(base + breakpoints[bp]) # Breakpoint insertion verify 
+
   proc.cont()
 
   event = dbg.waitProcessEvent()  
@@ -41,7 +56,14 @@ def fuzz(target, data):
       crash["addr"] = None
       crash["crash"] = False 
     return crash
-   
+
+
+  if event.signum == signal.SIGTRAP.value:        # TODO: does not hit sigtrap
+    print("Hit breakpoint {:08x}".format(proc.getInstrPointer()))
+    proc.cont()
+  #else:
+  #  print(event)
+ 
   crash["addr"] = None 
   crash["crash"] = False
   return crash 
@@ -108,7 +130,23 @@ if __name__ == "__main__":
   log_file = parser.logfile
   keep_fuzzing = True
 
+  breakpoints = {}
+
+  e = ELFFile(open(target, "rb"))
+  sym = e.get_section_by_name(".symtab")
+  if not sym:
+    print("Currently the fuzzer only supports non stripped binary. Your binary does not have a symbol table, sorry...")
+    sys.exit()
+
+  for symbol in sym.iter_symbols():
+    if symbol.name == "" or symbol.entry["st_value"] == 0 or symbol.entry["st_info"]["type"] != "STT_FUNC":
+      continue
+
+    breakpoints[symbol.name] = symbol.entry["st_value"]
+
+
   corpus = get_corpus(corpus)
+
   dbg = debugger.PtraceDebugger()
   random.seed(seed)
 
@@ -116,7 +154,7 @@ if __name__ == "__main__":
     corpus_file = random.choice(list(corpus.keys()))
     data = corpus[corpus_file]
     test_path = mutate(data)
-    crash = fuzz(target, test_path)
+    crash = fuzz(target, test_path, breakpoints)
 
     if crash["crash"]:
       print(f"[*] crash detected from {corpus_file} at address {hex(crash['addr'])}")
