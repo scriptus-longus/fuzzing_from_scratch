@@ -4,7 +4,7 @@ implementing a fuzzer from scratch in python to better understand the art of fuz
 # TODO:
 - better mutation
 - make faster
-- coverage
+- coverage (started)
 
 # usage
 ```
