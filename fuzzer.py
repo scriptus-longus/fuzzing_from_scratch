@@ -13,59 +13,64 @@ corpus_path = "corpus/"
 log_path = "logs/"
 test_case_path = "cases/"
 seed = 1337
+init_addr = 0x1000  # need to find using pyelftools
 
 state = {}
 crash_addresses = []
 #TODO: store current fuzzer state and restore
 #TODO: coverage 
+#TODO: get acutal address in vmmap
 
 def get_base(vmmap, target):
   for m in vmmap:
-    if "x" in m.permissions and target in m.pathname:
+    if "x" in m.permissions and m.pathname.endswith(os.path.basename(target)):
       return m.start
 
 def fuzz(target, data, breakpoints):
-  #data_content = bytearray(open(data, "rb").read())
   crash = {}
+  hit_breakpoints = []
   pid = debugger.child.createChild([target, data], no_stdout=True, env=None)
   proc = dbg.addProcess(pid, True)
   base = get_base(proc.readMappings(), target)
 
-  
-  for bp in breakpoints: 
-    proc.createBreakpoint(base + breakpoints[bp]) # Breakpoint insertion verify 
+  for bp in breakpoints:
+    proc.createBreakpoint(base + breakpoints[bp] - init_addr)
 
-  proc.cont()
-
-  event = dbg.waitProcessEvent()  
-
-  if event.signum == signal.SIGSEGV.value:
-    ip = proc.getInstrPointer()
-
-    for mapping in proc.readMappings():
-      if ip in mapping:
-        address = ip-mapping.start
-
-    proc.detach()
-    if address not in crash_addresses:
-      crash_addresses.append(address)
-
-      crash["addr"] = address
-      crash["crash"] = True
-    else:
-      crash["addr"] = None
-      crash["crash"] = False 
-    return crash
-
-
-  if event.signum == signal.SIGTRAP.value:        # TODO: does not hit sigtrap
-    print("Hit breakpoint {:08x}".format(proc.getInstrPointer()))
+  while True:
     proc.cont()
-  #else:
-  #  print(event)
- 
+    event = proc.waitEvent()  
+
+    if event.signum == signal.SIGSEGV.value:
+      ip = proc.getInstrPointer()
+
+      for mapping in proc.readMappings():
+        if ip in mapping:
+          address = ip-mapping.start
+
+      proc.detach()
+      if address not in crash_addresses:
+        crash_addresses.append(address)
+
+        crash["addr"] = address
+        crash["crash"] = True
+      else:
+        crash["addr"] = None
+        crash["crash"] = False 
+      return crash
+
+    elif event.signum == signal.SIGTRAP.value:        # TODO: does not hit sigtrap
+      #print("Hit breakpoint {:08x}".format(proc.getInstrPointer()))
+      hit_breakpoints.append(proc.getInstrPointer())
+    elif isinstance(event, debugger.ProcessExit):
+      proc.detach()
+      break
+    else:
+      pass
+
+
   crash["addr"] = None 
   crash["crash"] = False
+  crash["breakpoints"] = hit_breakpoints
   return crash 
 
 def mutate(data):
