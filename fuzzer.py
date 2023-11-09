@@ -22,7 +22,6 @@ state = {}
 crash_addresses = []
 #TODO: store current fuzzer state and restore
 #TODO: coverage 
-#TODO: get acutal address in vmmap
 
 def get_base(vmmap, target):
   for m in vmmap:
