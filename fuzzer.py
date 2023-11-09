@@ -15,6 +15,9 @@ test_case_path = "cases/"
 seed = 1337
 init_addr = 0x1000  # need to find using pyelftools
 
+dbg = debugger.PtraceDebugger()
+random.seed(seed)
+
 state = {}
 crash_addresses = []
 #TODO: store current fuzzer state and restore
@@ -26,6 +29,24 @@ def get_base(vmmap, target):
     if "x" in m.permissions and m.pathname.endswith(os.path.basename(target)):
       return m.start
 
+def adjust_init(target, breakpoints):
+  content = bytearray(open(target, "rb").read())
+  addresses = list(breakpoints.values())
+  print(addresses)
+  id_sequence = content[addresses[0]:addresses[0]+10]
+
+  pid = debugger.child.createChild([target, "corpus/sample.txt"], no_stdout=True, env=None)
+  proc = dbg.addProcess(pid, True)
+  base = get_base(proc.readMappings(), target)   
+ 
+  for i in range(0x0, 0x1000):
+    current_bytes = proc.readBytes(base + i, 10) 
+    if current_bytes == id_sequence:
+      init_offset = addresses[0] - i
+      break
+
+  breakpoints = {k: breakpoints[k]-init_offset for k in breakpoints}
+
 def fuzz(target, data, breakpoints):
   crash = {}
   hit_breakpoints = []
@@ -34,7 +55,7 @@ def fuzz(target, data, breakpoints):
   base = get_base(proc.readMappings(), target)
 
   for bp in breakpoints:
-    proc.createBreakpoint(base + breakpoints[bp] - init_addr)
+    proc.createBreakpoint(base + breakpoints[bp])
 
   while True:
     proc.cont()
@@ -150,10 +171,10 @@ if __name__ == "__main__":
     breakpoints[symbol.name] = symbol.entry["st_value"]
 
 
-  corpus = get_corpus(corpus)
+  breakpoints = {k: breakpoints[k] for k in sorted(breakpoints, key=lambda x: breakpoints[x])}
+  adjust_init(target, breakpoints)
 
-  dbg = debugger.PtraceDebugger()
-  random.seed(seed)
+  corpus = get_corpus(corpus)
 
   while keep_fuzzing:
     corpus_file = random.choice(list(corpus.keys()))
