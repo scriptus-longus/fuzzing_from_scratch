@@ -23,6 +23,7 @@ crash_addresses = []
 #TODO: store current fuzzer state and restore
 #TODO: coverage 
 
+
 def get_base(vmmap, target):
   for m in vmmap:
     if "x" in m.permissions and m.pathname.endswith(os.path.basename(target)):
@@ -44,7 +45,7 @@ def adjust_init(target, breakpoints):
       init_offset = addresses[0] - i
       break
 
-  breakpoints = {k: breakpoints[k]-init_offset for k in breakpoints}
+  return {k: breakpoints[k]-0x1000 for k in breakpoints}
 
 def fuzz(target, data, breakpoints):
   crash = {}
@@ -80,7 +81,7 @@ def fuzz(target, data, breakpoints):
 
     elif event.signum == signal.SIGTRAP.value:        # TODO: does not hit sigtrap
       #print("Hit breakpoint {:08x}".format(proc.getInstrPointer()))
-      hit_breakpoints.append(proc.getInstrPointer())
+      hit_breakpoints.append(proc.getInstrPointer() - base)
     elif isinstance(event, debugger.ProcessExit):
       proc.detach()
       break
@@ -155,6 +156,8 @@ if __name__ == "__main__":
   log_file = parser.logfile
   keep_fuzzing = True
 
+  known_points = []
+
   breakpoints = {}
 
   e = ELFFile(open(target, "rb"))
@@ -171,15 +174,25 @@ if __name__ == "__main__":
 
 
   breakpoints = {k: breakpoints[k] for k in sorted(breakpoints, key=lambda x: breakpoints[x])}
-  adjust_init(target, breakpoints)
+  breakpoints = adjust_init(target, breakpoints)
 
   corpus = get_corpus(corpus)
 
   while keep_fuzzing:
-    corpus_file = random.choice(list(corpus.keys()))
+    corpus_file = random.choice(list(corpus.keys()))  # TODO: adjust probability
     data = corpus[corpus_file]
     test_path = mutate(data)
     crash = fuzz(target, test_path, breakpoints)
+
+    trace = crash["breakpoints"]
+
+    if set(trace) - set(known_points):
+      new_point = list(set(trace) - set(known_points))
+      known_points += new_point
+      # TODO: add to corpus     
+      print(known_points)
+    
+
 
     if crash["crash"]:
       print(f"[*] crash detected from {corpus_file} at address {hex(crash['addr'])}")
