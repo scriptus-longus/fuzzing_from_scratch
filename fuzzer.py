@@ -6,6 +6,8 @@ import os
 import json
 import sys
 
+from tracer import Tracer
+from mutator import Mutator
 from elftools.elf.elffile import ELFFile
 from elftools.elf.elffile import SymbolTableSection
 
@@ -176,13 +178,17 @@ if __name__ == "__main__":
   breakpoints = {k: breakpoints[k] for k in sorted(breakpoints, key=lambda x: breakpoints[x])}
   breakpoints = adjust_init(target, breakpoints)
 
-  corpus = get_corpus(corpus)
+  mutator = Mutator(corpus)  
+  tracer = Tracer(target)
+  #corpus = get_corpus(corpus)
 
-  while keep_fuzzing:
-    corpus_file = random.choice(list(corpus.keys()))  # TODO: adjust probability
-    data = corpus[corpus_file]
-    test_path = mutate(data)
-    crash = fuzz(target, test_path, breakpoints)
+ 
+  for filename, data in mutator:
+    #corpus_file = random.choice(list(corpus.keys()))  # TODO: adjust probability
+    #data = corpus[corpus_file]
+    #test_path = mutate(data)
+    #crash = fuzz(target, filename, breakpoints)
+    crash = tracer.run(filename)
 
     trace = crash["breakpoints"]
 
