@@ -161,7 +161,7 @@ if __name__ == "__main__":
   known_points = []
 
   breakpoints = {}
-
+  """
   e = ELFFile(open(target, "rb"))
   sym = e.get_section_by_name(".symtab")
   if not sym:
@@ -177,13 +177,13 @@ if __name__ == "__main__":
 
   breakpoints = {k: breakpoints[k] for k in sorted(breakpoints, key=lambda x: breakpoints[x])}
   breakpoints = adjust_init(target, breakpoints)
-
+  """
   mutator = Mutator(corpus)  
   tracer = Tracer(target)
   #corpus = get_corpus(corpus)
 
  
-  for filename, data in mutator:
+  for filename, content in mutator:
     #corpus_file = random.choice(list(corpus.keys()))  # TODO: adjust probability
     #data = corpus[corpus_file]
     #test_path = mutate(data)
@@ -192,12 +192,15 @@ if __name__ == "__main__":
 
     trace = crash["breakpoints"]
 
+    mutator.add(content, trace)
+    
+    """
     if set(trace) - set(known_points):
       new_point = list(set(trace) - set(known_points))
       known_points += new_point
       # TODO: add to corpus     
       print(known_points)
-    
+    """ 
 
 
     if crash["crash"]:

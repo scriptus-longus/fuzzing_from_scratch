@@ -98,6 +98,6 @@ class Tracer:
 
     crash["addr"] = None 
     crash["crash"] = False
-    crash["breakpoints"] = hit_breakpoints
+    crash["breakpoints"] = [(x,y) for x, y in zip(hit_breakpoints[:-1], hit_breakpoints[1:])]
     return crash 
     
