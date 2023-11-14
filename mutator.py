@@ -32,9 +32,11 @@ class Mutator:
 
   def mutate(self, filename, test_file="test_case"):
     data = list(self.corpus[filename])
-    idx = random.choice(range(len(data)))
+    methods = [self.bit_flip]
 
-    data[idx]  ^= random.choice([2**0, 2**1, 2**2, 2**3, 2**4, 2**5, 2**6, 2**7])
+    mutation_method = random.choice(methods)
+    data = mutation_method(data) 
+    #data[idx]  ^= random.choice([2**0, 2**1, 2**2, 2**3, 2**4, 2**5, 2**6, 2**7])
     data = bytearray(data)
 
     path = os.path.join(self.test_case_path, test_file)
@@ -44,6 +46,23 @@ class Mutator:
     
     return (path, data)
 
+  
+  def bit_flip(self, data):
+    n = random.choice([1, 2, 4, 8, 16, 32])
+
+    for idx in random.choices(range(len(data)), k=n):
+      data[idx]  ^= random.choice([2**0, 2**1, 2**2, 2**3, 2**4, 2**5, 2**6, 2**7])
+
+    return data
+
+  def byte_flip(self, data):
+    n = random.choice([1, 2, 4, 8, 16, 32])
+
+    for idx in random.choices(range(len(data)), k=n):
+      data[idx]  ^=  random.getrandbits(8)
+
+    return data
+    
 
   def add(self, content, trace):
     if set(trace) - set(self.known_points):
@@ -52,6 +71,7 @@ class Mutator:
 
       filename = "sample_" + str(len(self.corpus))
       self.corpus["sample_" + str(len(self.corpus))] = content
+      print(trace)
       print(self.corpus)
    
   def __iter__(self):
@@ -66,4 +86,5 @@ class Mutator:
 
     filename = list(self.pool.keys())[0]
     content = self.pool.pop(filename)
+    #print(content)
     return filename, content #self.mutate(filename) #random.choice(list(self.corpus.keys()))
