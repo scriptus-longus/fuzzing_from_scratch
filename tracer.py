@@ -59,9 +59,9 @@ class Tracer:
       if symbol.name == "" or symbol.entry["st_value"] == 0 or symbol.entry["st_info"]["type"] != "STT_FUNC":
         continue
 
-      print(symbol.entry["st_size"])
       addr = symbol.entry["st_value"]
       instr = content[addr]
+      
       self.breakpoints[symbol.name] = Breakpoint(addr, instr)
 
 
