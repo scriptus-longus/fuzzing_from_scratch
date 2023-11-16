@@ -2,15 +2,17 @@ import random
 import os
 
 class Mutator:
-  def __init__(self, corpus_path, test_case_path="cases"):
+  def __init__(self, corpus_path, test_case_path="cases", seed=1337):
     self.corpus_path = corpus_path
 
-    self.corpus = {}  
+    self.corpus = {}
+    self.seed = seed  
     #self.corpus = []
     self.pool = {}
 
     self.known_points = []
 
+    random.seed(self.seed)
     self.test_case_path = test_case_path
     self._load_corpus()
 
@@ -43,7 +45,11 @@ class Mutator:
 
     with open(path, "wb") as f:
       f.write(data)
-    
+
+    if data[0] == 0x41:
+      print("A there")
+      if data[1] == 0x42:
+        print("all there")    
     return (path, data)
 
   
