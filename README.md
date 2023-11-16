@@ -1,10 +1,7 @@
 # fuzzing_from_scratch
 implementing a fuzzer from scratch in python to better understand the art of fuzzing
 
-# TODO:
-- better mutation
-- make faster
-- coverage (started)
+Docs comming soon!
 
 # usage
 ```
