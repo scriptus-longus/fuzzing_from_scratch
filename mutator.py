@@ -17,15 +17,19 @@ class Mutator:
     self._load_corpus()
 
   def _load_corpus(self):
+
     for filename in os.listdir(self.corpus_path):
       filepath = os.path.join(self.corpus_path, filename)
       if os.path.isfile(filepath):
         self.corpus[filename] = bytearray(open(filepath, "rb").read())
-        
+
+  #def _create_corpus(self):
+  #  self.corpus = list(self.core.keys())
+
   def _create_pool(self):
     for corpus_file in list(self.corpus.keys()):
       test_file, content = self.mutate(corpus_file, test_file=corpus_file + "_test_case")
-
+      #self.pool[test_file] = content 
       self.pool[test_file] = content
 
   def mutate(self, filename, test_file="test_case"):
@@ -41,8 +45,8 @@ class Mutator:
 
     with open(path, "wb") as f:
       f.write(data)
-      
     return (path, data)
+
   
   def bit_flip(self, data):
     n = random.choice([1, 2, 4, 8, 16, 32])
@@ -68,8 +72,8 @@ class Mutator:
 
       filename = "sample_" + str(len(self.corpus))
       self.corpus["sample_" + str(len(self.corpus))] = content
-      print(trace)
-      print(self.corpus)
+      #print(trace)
+      #print(self.corpus)
    
   def __iter__(self):
     #self._create_corpus()
@@ -77,10 +81,11 @@ class Mutator:
     return self
 
   def __next__(self):
+    #filename = random.choice(list(self.corpus.keys()))
     if len(self.pool) == 0:
       self._create_pool()
 
     filename = list(self.pool.keys())[0]
     content = self.pool.pop(filename)
-
+    #print(content)
     return filename, content #self.mutate(filename) #random.choice(list(self.corpus.keys()))

@@ -6,6 +6,7 @@ import sys
 import pickle
 
 from tracer import Tracer
+from tracer import Breakpoint
 from mutator import Mutator
 
 corpus_path = "corpus/"
@@ -64,16 +65,33 @@ def log_fuzzer_state(state):
   json.dump(tracer_log, tracer_file)
    
   
-def load_fuzzer_state(folder):
-  pass 
+def restore_fuzzer_state(folder, mutator, tracer):
+  mutator_state = json.loads(open(os.path.join(folder, "mutator.sta"), "r").read()) 
+  tracer_state = json.loads(open(os.path.join(folder, "tracer.sta"), "r").read())
+
+  corpus = {k: bytearray(mutator_state["corpus"][k]) for k in mutator_state["corpus"]}
+  known_points = [tuple(x) for x in mutator_state["known_points"]]
+ 
+  breakpoints = {}
+ 
+  for bp in tracer_state["breakpoints"]:
+    breakpoints[bp] = Breakpoint(tracer_state["breakpoints"][bp][0], tracer_state["breakpoints"][bp][0])
+ 
+  crashes = tracer_state["crashes"]
+
+  mutator.corpus = corpus
+  mutator.known_points = known_points
+  tracer.unique_crashes = crashes
+  tracer.breakpoints = breakpoints
+ 
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
   parser.add_argument("--corpus", help="path to sample files", required=True)
-  parser.add_argument("--case_path", help="folder to save test cases to")  # TODO
+  parser.add_argument("--case_path", help="folder to save test cases to")  
   parser.add_argument("--logfile", help="default name for logfile (gets saved to logs folder)", default="mylog.log")
-  parser.add_argument("--logfolder", help="name of folder to save logfiles", default="logs") # TODO
-  parser.add_argument("--pickup", help="folder with fuzzer state to pick up from", default="logs") # TODO
+  parser.add_argument("--logfolder", help="name of folder to save logfiles", default="logs") 
+  parser.add_argument("--pickup", help="folder with fuzzer state to pick up from", default=None) 
   parser.add_argument("--no-print", help="dont print log info while running", action="store_false", dest="log")
   parser.add_argument("--seed", help="set seed for random") # TEST
   parser.add_argument("target", help="program to fuzz")
@@ -82,22 +100,27 @@ if __name__ == "__main__":
   corpus = parser.corpus
   target = parser.target
   show_log_info = parser.log
+  log_path = parser.logfolder
   log_file = parser.logfile
   seed = parser.seed or seed
-  keep_fuzzing = True
+  pickup_folder = parser.pickup
+  test_case_path = paraser.case_path
 
-  print(seed)
+  keep_fuzzing = True
 
   mutator = Mutator(corpus, test_case_path=test_case_path, seed=seed)  
   tracer = Tracer(target)
+
+  if pickup_folder:
+    restore_fuzzer_state(pickup_folder, mutator, tracer)
   
   signal.signal(signal.SIGINT, signal_handler)
  
   for filename, content in mutator:
     if not keep_running:
       break
-    crash = tracer.run(filename)
 
+    crash = tracer.run(filename)
     trace = crash["breakpoints"]
 
     mutator.add(content, trace)
